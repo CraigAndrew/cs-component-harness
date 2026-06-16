@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Component harness (prototype)</title>
+		<style>
+			* { box-sizing: border-box; }
+			body {
+				margin: 0;
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+				color: #172b4d;
+				background: #fff;
+			}
+			.harness { display: flex; min-height: 100vh; }
+			.stage {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 24px;
+				background: #f4f5f7;
+			}
+			.controls {
+				width: 240px;
+				border-left: 1px solid #dfe1e6;
+				padding: 14px 16px;
+				font-size: 13px;
+			}
+			.controls h3 { margin: 0 0 4px; font-size: 13px; }
+			.controls .muted { color: #6b778c; font-size: 11px; margin: 0 0 12px; }
+			.controls label { display: block; margin: 10px 0 4px; font-weight: 600; }
+			.controls select, .controls input {
+				width: 100%; padding: 6px 8px; border: 1px solid #dfe1e6; border-radius: 4px; font: inherit;
+			}
+			/* Mock EntitySwitcher */
+			.es {
+				width: 320px; background: #fff; border: 1px solid #dfe1e6; border-radius: 8px;
+				box-shadow: 0 1px 4px rgba(9,30,66,.13); overflow: hidden;
+			}
+			.es-button {
+				width: 100%; text-align: left; padding: 12px 14px; border: none; background: #fff;
+				cursor: pointer; font: inherit; display: flex; justify-content: space-between; align-items: center;
+			}
+			.es-button:hover { background: #f4f5f7; }
+			.es-current { font-weight: 600; }
+			.es-sub { color: #6b778c; font-size: 12px; }
+			.es-menu { border-top: 1px solid #dfe1e6; }
+			.es-opt { padding: 10px 14px; cursor: pointer; }
+			.es-opt:hover { background: #deebff; }
+			.es-banner { padding: 10px 14px; background: #fffae6; color: #974f0c; font-size: 12px; }
+			/* Mock StoreDashboard */
+			.dash { width: 360px; background: #fff; border: 1px solid #dfe1e6; border-radius: 8px; padding: 16px; }
+			.dash h2 { margin: 0 0 2px; font-size: 16px; }
+			.dash .ts { color: #6b778c; font-size: 12px; margin: 0 0 12px; }
+			.dash .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+			.dash .tile { background: #f4f5f7; border-radius: 6px; padding: 12px; }
+			.dash .tile b { display: block; font-size: 18px; }
+		</style>
+	</head>
+	<body>
+		<div class="harness">
+			<div class="stage" id="stage"></div>
+			<div class="controls" id="controls"></div>
+		</div>
+		<script>
+			// Throwaway Storybook-style harness: addressable by ?story=<id>, renders an
+			// interactive mock component + a controls panel, and posts every change up
+			// to the embedding parent (the Test Scenarios Components tab) so a change can
+			// become a requested edit. Mirrors Storybook's iframe.html?id= contract so a
+			// real Storybook can be swapped in by changing only the URL.
+			const params = new URLSearchParams(location.search);
+			const storyId = params.get('story') || params.get('id') || 'entity-switcher';
+			const stage = document.getElementById('stage');
+			const controls = document.getElementById('controls');
+
+			const ENTITIES = [
+				{ company: 'Smoke Company A', brand: 'Smoke Brand A', store: 'Smoke Store A' },
+				{ company: 'Smoke Company B', brand: 'Smoke Brand B', store: 'Smoke Store B' },
+				{ company: 'Acme Foods', brand: 'Acme Grill', store: 'Acme Central' },
+			];
+
+			// Report an interaction/change to the parent frame.
+			const emit = (change) => {
+				try {
+					parent.postMessage(
+						{ source: 'cs-component-harness', story: storyId, ...change },
+						'*',
+					);
+				} catch {}
+			};
+
+			function entitySwitcher() {
+				let open = false;
+				let idx = 0;
+				let switching = false;
+				const root = document.createElement('div');
+				root.className = 'es';
+				const render = () => {
+					const e = ENTITIES[idx];
+					root.innerHTML = '';
+					const btn = document.createElement('button');
+					btn.className = 'es-button';
+					btn.innerHTML =
+						'<span><span class="es-current">' + e.store + '</span>' +
+						'<br><span class="es-sub">' + e.company + ' · ' + e.brand + '</span></span>' +
+						'<span>▾</span>';
+					btn.onclick = () => { open = !open; render(); };
+					root.appendChild(btn);
+					if (switching) {
+						const b = document.createElement('div');
+						b.className = 'es-banner';
+						b.textContent = 'Switching context…';
+						root.appendChild(b);
+					} else if (open) {
+						const menu = document.createElement('div');
+						menu.className = 'es-menu';
+						ENTITIES.forEach((opt, i) => {
+							const o = document.createElement('div');
+							o.className = 'es-opt';
+							o.textContent = opt.store + ' — ' + opt.company;
+							o.onclick = () => {
+								open = false; switching = true; render();
+								emit({ event: 'switch-entity', to: opt });
+								setTimeout(() => { idx = i; switching = false; render(); }, 700);
+							};
+							menu.appendChild(o);
+						});
+						root.appendChild(menu);
+					}
+				};
+				render();
+				return root;
+			}
+
+			function storeDashboard(opts) {
+				const root = document.createElement('div');
+				root.className = 'dash';
+				const title = opts.title || 'Store dashboard';
+				root.innerHTML =
+					'<h2>' + title + '</h2><p class="ts">Last updated just now</p>' +
+					'<div class="tiles">' +
+					'<div class="tile">Sales today<b>R 4,210</b></div>' +
+					'<div class="tile">Transactions<b>128</b></div>' +
+					'<div class="tile">Avg basket<b>R 32.90</b></div>' +
+					'<div class="tile">Open tills<b>3</b></div>' +
+					'</div>';
+				return root;
+			}
+
+			function mount() {
+				stage.innerHTML = '';
+				controls.innerHTML = '';
+				if (storyId === 'store-dashboard') {
+					const titleVal = 'Store dashboard';
+					stage.appendChild(storeDashboard({ title: titleVal }));
+					controls.innerHTML = '<h3>StoreDashboard</h3><p class="muted">Live component (prototype)</p>';
+					const label = document.createElement('label');
+					label.textContent = 'Heading';
+					const input = document.createElement('input');
+					input.value = titleVal;
+					input.oninput = () => {
+						stage.innerHTML = '';
+						stage.appendChild(storeDashboard({ title: input.value }));
+						emit({ event: 'prop-change', prop: 'title', value: input.value });
+					};
+					controls.appendChild(label);
+					controls.appendChild(input);
+				} else {
+					stage.appendChild(entitySwitcher());
+					controls.innerHTML =
+						'<h3>EntitySwitcher</h3><p class="muted">Live component (prototype) — open it and pick an entity; the change is reported to the Test Scenarios app.</p>';
+				}
+			}
+
+			mount();
+			emit({ event: 'mounted' });
+		</script>
+	</body>
+</html>
