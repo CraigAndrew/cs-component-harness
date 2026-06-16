@@ -167,8 +167,29 @@
 
 			const renderStage = () => {
 				stage.innerHTML = '';
-				stage.appendChild(story.render(args));
+				const root = document.createElement('div');
+				root.id = 'cs-component-root';
+				root.appendChild(story.render(args));
+				stage.appendChild(root);
 			};
+
+			// Live style overrides pushed down from the host (the Test Scenarios
+			// Components panel). The host authors CSS; we inject it so the real
+			// component restyles in place. The override CSS is what the host captures
+			// as the requested styling change.
+			let overrideEl = null;
+			window.addEventListener('message', (e) => {
+				const d = e.data;
+				if (!d || d.source !== 'cs-host') return;
+				if (d.type === 'apply-style') {
+					if (!overrideEl) {
+						overrideEl = document.createElement('style');
+						overrideEl.id = 'cs-override';
+						document.head.appendChild(overrideEl);
+					}
+					overrideEl.textContent = d.css || '';
+				}
+			});
 
 			const renderControls = () => {
 				controls.innerHTML = '';
@@ -222,6 +243,8 @@
 
 			renderStage();
 			renderControls();
+			// Tell the host we're ready so it can (re)send any active style override.
+			emit({ event: 'ready' });
 			emit({ event: 'mounted' });
 		</script>
 	</body>
