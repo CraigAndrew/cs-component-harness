@@ -22,17 +22,21 @@
 				background: #f4f5f7;
 			}
 			.controls {
-				width: 240px;
+				width: 260px;
 				border-left: 1px solid #dfe1e6;
 				padding: 14px 16px;
 				font-size: 13px;
+				background: #fff;
 			}
-			.controls h3 { margin: 0 0 4px; font-size: 13px; }
+			.controls h3 { margin: 0 0 2px; font-size: 13px; }
 			.controls .muted { color: #6b778c; font-size: 11px; margin: 0 0 12px; }
-			.controls label { display: block; margin: 10px 0 4px; font-weight: 600; }
-			.controls select, .controls input {
+			.controls .field { margin: 0 0 10px; }
+			.controls label { display: block; margin: 0 0 3px; font-weight: 600; font-size: 11px; color: #5e6c84; text-transform: uppercase; letter-spacing: .03em; }
+			.controls input[type=text] {
 				width: 100%; padding: 6px 8px; border: 1px solid #dfe1e6; border-radius: 4px; font: inherit;
 			}
+			.controls .check { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+			.controls .hint { color: #6b778c; font-size: 11px; margin-top: 12px; border-top: 1px solid #ebecf0; padding-top: 10px; }
 			/* Mock EntitySwitcher */
 			.es {
 				width: 320px; background: #fff; border: 1px solid #dfe1e6; border-radius: 8px;
@@ -65,115 +69,159 @@
 		</div>
 		<script>
 			// Throwaway Storybook-style harness: addressable by ?story=<id>, renders an
-			// interactive mock component + a controls panel, and posts every change up
-			// to the embedding parent (the Test Scenarios Components tab) so a change can
-			// become a requested edit. Mirrors Storybook's iframe.html?id= contract so a
-			// real Storybook can be swapped in by changing only the URL.
+			// interactive mock component plus a Controls panel that edits the
+			// component's props/args (the same "edit" model Storybook uses). Every edit
+			// re-renders the component live AND is posted up to the embedding parent
+			// (the Test Scenarios Components tab) so the change can become a requested
+			// edit in a PR. Mirrors Storybook's iframe.html?id= contract.
 			const params = new URLSearchParams(location.search);
 			const storyId = params.get('story') || params.get('id') || 'entity-switcher';
 			const stage = document.getElementById('stage');
 			const controls = document.getElementById('controls');
 
-			const ENTITIES = [
-				{ company: 'Smoke Company A', brand: 'Smoke Brand A', store: 'Smoke Store A' },
-				{ company: 'Smoke Company B', brand: 'Smoke Brand B', store: 'Smoke Store B' },
-				{ company: 'Acme Foods', brand: 'Acme Grill', store: 'Acme Central' },
-			];
-
-			// Report an interaction/change to the parent frame.
 			const emit = (change) => {
 				try {
-					parent.postMessage(
-						{ source: 'cs-component-harness', story: storyId, ...change },
-						'*',
-					);
+					parent.postMessage({ source: 'cs-component-harness', story: storyId, ...change }, '*');
 				} catch {}
 			};
 
-			function entitySwitcher() {
-				let open = false;
-				let idx = 0;
-				let switching = false;
-				const root = document.createElement('div');
-				root.className = 'es';
-				const render = () => {
-					const e = ENTITIES[idx];
-					root.innerHTML = '';
-					const btn = document.createElement('button');
-					btn.className = 'es-button';
-					btn.innerHTML =
-						'<span><span class="es-current">' + e.store + '</span>' +
-						'<br><span class="es-sub">' + e.company + ' · ' + e.brand + '</span></span>' +
-						'<span>▾</span>';
-					btn.onclick = () => { open = !open; render(); };
-					root.appendChild(btn);
-					if (switching) {
-						const b = document.createElement('div');
-						b.className = 'es-banner';
-						b.textContent = 'Switching context…';
-						root.appendChild(b);
-					} else if (open) {
-						const menu = document.createElement('div');
-						menu.className = 'es-menu';
-						ENTITIES.forEach((opt, i) => {
-							const o = document.createElement('div');
-							o.className = 'es-opt';
-							o.textContent = opt.store + ' — ' + opt.company;
-							o.onclick = () => {
-								open = false; switching = true; render();
-								emit({ event: 'switch-entity', to: opt });
-								setTimeout(() => { idx = i; switching = false; render(); }, 700);
-							};
-							menu.appendChild(o);
-						});
-						root.appendChild(menu);
-					}
-				};
-				render();
-				return root;
-			}
+			// --- Stories: each has editable `args` + a render(args) function ---
 
-			function storeDashboard(opts) {
-				const root = document.createElement('div');
-				root.className = 'dash';
-				const title = opts.title || 'Store dashboard';
-				root.innerHTML =
-					'<h2>' + title + '</h2><p class="ts">Last updated just now</p>' +
-					'<div class="tiles">' +
-					'<div class="tile">Sales today<b>R 4,210</b></div>' +
-					'<div class="tile">Transactions<b>128</b></div>' +
-					'<div class="tile">Avg basket<b>R 32.90</b></div>' +
-					'<div class="tile">Open tills<b>3</b></div>' +
-					'</div>';
-				return root;
-			}
+			const stories = {
+				'entity-switcher': {
+					title: 'EntitySwitcher',
+					args: {
+						store: 'Smoke Store A',
+						company: 'Smoke Company A',
+						brand: 'Smoke Brand A',
+						switching: false,
+					},
+					controls: [
+						{ key: 'store', label: 'Store', type: 'text' },
+						{ key: 'company', label: 'Company', type: 'text' },
+						{ key: 'brand', label: 'Brand', type: 'text' },
+						{ key: 'switching', label: 'Show "Switching context…" banner', type: 'boolean' },
+					],
+					hint: 'Edit the props on the right — the component updates live and the change is reported to the Test Scenarios app. Or open the dropdown to interact.',
+					render(args) {
+						let open = false;
+						const root = document.createElement('div');
+						root.className = 'es';
+						const draw = () => {
+							root.innerHTML = '';
+							const btn = document.createElement('button');
+							btn.className = 'es-button';
+							btn.innerHTML =
+								'<span><span class="es-current">' + args.store + '</span><br>' +
+								'<span class="es-sub">' + args.company + ' · ' + args.brand + '</span></span><span>▾</span>';
+							btn.onclick = () => { open = !open; draw(); };
+							root.appendChild(btn);
+							if (args.switching) {
+								const b = document.createElement('div');
+								b.className = 'es-banner';
+								b.textContent = 'Switching context…';
+								root.appendChild(b);
+							} else if (open) {
+								const menu = document.createElement('div');
+								menu.className = 'es-menu';
+								['Smoke Store B — Smoke Company B', 'Acme Central — Acme Foods'].forEach((label) => {
+									const o = document.createElement('div');
+									o.className = 'es-opt';
+									o.textContent = label;
+									o.onclick = () => { open = false; draw(); emit({ event: 'switch-entity', to: label }); };
+									menu.appendChild(o);
+								});
+								root.appendChild(menu);
+							}
+						};
+						draw();
+						return root;
+					},
+				},
+				'store-dashboard': {
+					title: 'StoreDashboard',
+					args: { heading: 'Store dashboard', sales: 'R 4,210', transactions: '128' },
+					controls: [
+						{ key: 'heading', label: 'Heading', type: 'text' },
+						{ key: 'sales', label: 'Sales today', type: 'text' },
+						{ key: 'transactions', label: 'Transactions', type: 'text' },
+					],
+					hint: 'Edit the props on the right — the component updates live and the change is reported to the Test Scenarios app.',
+					render(args) {
+						const root = document.createElement('div');
+						root.className = 'dash';
+						root.innerHTML =
+							'<h2>' + args.heading + '</h2><p class="ts">Last updated just now</p>' +
+							'<div class="tiles">' +
+							'<div class="tile">Sales today<b>' + args.sales + '</b></div>' +
+							'<div class="tile">Transactions<b>' + args.transactions + '</b></div>' +
+							'<div class="tile">Avg basket<b>R 32.90</b></div>' +
+							'<div class="tile">Open tills<b>3</b></div></div>';
+						return root;
+					},
+				},
+			};
 
-			function mount() {
+			const story = stories[storyId] || stories['entity-switcher'];
+			const args = { ...story.args };
+
+			const renderStage = () => {
 				stage.innerHTML = '';
-				controls.innerHTML = '';
-				if (storyId === 'store-dashboard') {
-					const titleVal = 'Store dashboard';
-					stage.appendChild(storeDashboard({ title: titleVal }));
-					controls.innerHTML = '<h3>StoreDashboard</h3><p class="muted">Live component (prototype)</p>';
-					const label = document.createElement('label');
-					label.textContent = 'Heading';
-					const input = document.createElement('input');
-					input.value = titleVal;
-					input.oninput = () => {
-						stage.innerHTML = '';
-						stage.appendChild(storeDashboard({ title: input.value }));
-						emit({ event: 'prop-change', prop: 'title', value: input.value });
-					};
-					controls.appendChild(label);
-					controls.appendChild(input);
-				} else {
-					stage.appendChild(entitySwitcher());
-					controls.innerHTML =
-						'<h3>EntitySwitcher</h3><p class="muted">Live component (prototype) — open it and pick an entity; the change is reported to the Test Scenarios app.</p>';
-				}
-			}
+				stage.appendChild(story.render(args));
+			};
 
-			mount();
+			const renderControls = () => {
+				controls.innerHTML = '';
+				const h = document.createElement('h3');
+				h.textContent = story.title;
+				controls.appendChild(h);
+				const sub = document.createElement('p');
+				sub.className = 'muted';
+				sub.textContent = 'Controls (prototype)';
+				controls.appendChild(sub);
+
+				story.controls.forEach((c) => {
+					const field = document.createElement('div');
+					field.className = 'field';
+					if (c.type === 'boolean') {
+						const lab = document.createElement('label');
+						lab.className = 'check';
+						const cb = document.createElement('input');
+						cb.type = 'checkbox';
+						cb.checked = Boolean(args[c.key]);
+						cb.onchange = () => {
+							args[c.key] = cb.checked;
+							renderStage();
+							emit({ event: 'prop-change', prop: c.key, value: cb.checked });
+						};
+						lab.appendChild(cb);
+						lab.appendChild(document.createTextNode(' ' + c.label));
+						field.appendChild(lab);
+					} else {
+						const lab = document.createElement('label');
+						lab.textContent = c.label;
+						const input = document.createElement('input');
+						input.type = 'text';
+						input.value = args[c.key];
+						input.oninput = () => {
+							args[c.key] = input.value;
+							renderStage();
+							emit({ event: 'prop-change', prop: c.key, value: input.value });
+						};
+						field.appendChild(lab);
+						field.appendChild(input);
+					}
+					controls.appendChild(field);
+				});
+
+				const hint = document.createElement('div');
+				hint.className = 'hint';
+				hint.textContent = story.hint;
+				controls.appendChild(hint);
+			};
+
+			renderStage();
+			renderControls();
 			emit({ event: 'mounted' });
 		</script>
 	</body>
