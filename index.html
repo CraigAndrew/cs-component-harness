@@ -37,26 +37,42 @@
 			}
 			.controls .check { display: flex; align-items: center; gap: 6px; font-weight: 600; }
 			.controls .hint { color: #6b778c; font-size: 11px; margin-top: 12px; border-top: 1px solid #ebecf0; padding-top: 10px; }
+			/* Design tokens — the host's Theme tokens controls override these CSS
+			   variables on #cs-component-root, so a theme change cascades through
+			   the component internals. */
+			#cs-component-root {
+				--cs-surface: #fff;
+				--cs-text: #172b4d;
+				--cs-muted: #6b778c;
+				--cs-accent: #0052cc;
+				--cs-radius: 8px;
+				--cs-space: 14px;
+				--cs-font: 13px;
+			}
 			/* Mock EntitySwitcher */
 			.es {
-				width: 320px; background: #fff; border: 1px solid #dfe1e6; border-radius: 8px;
-				box-shadow: 0 1px 4px rgba(9,30,66,.13); overflow: hidden;
+				width: 320px; background: var(--cs-surface); border: 1px solid #dfe1e6;
+				border-radius: var(--cs-radius); box-shadow: 0 1px 4px rgba(9,30,66,.13); overflow: hidden;
 			}
 			.es-button {
-				width: 100%; text-align: left; padding: 12px 14px; border: none; background: #fff;
-				cursor: pointer; font: inherit; display: flex; justify-content: space-between; align-items: center;
+				width: 100%; text-align: left; padding: var(--cs-space); border: none; background: var(--cs-surface);
+				color: var(--cs-text); cursor: pointer; font: inherit; font-size: var(--cs-font);
+				display: flex; justify-content: space-between; align-items: center;
 			}
-			.es-button:hover { background: #f4f5f7; }
+			.es-button:hover { background: color-mix(in srgb, var(--cs-accent) 8%, var(--cs-surface)); }
 			.es-current { font-weight: 600; }
-			.es-sub { color: #6b778c; font-size: 12px; }
+			.es-sub { color: var(--cs-muted); font-size: 12px; }
 			.es-menu { border-top: 1px solid #dfe1e6; }
 			.es-opt { padding: 10px 14px; cursor: pointer; }
-			.es-opt:hover { background: #deebff; }
-			.es-banner { padding: 10px 14px; background: #fffae6; color: #974f0c; font-size: 12px; }
+			.es-opt:hover { background: color-mix(in srgb, var(--cs-accent) 15%, var(--cs-surface)); }
+			.es-banner { padding: 10px 14px; background: color-mix(in srgb, var(--cs-accent) 12%, #fff); color: var(--cs-accent); font-size: 12px; }
 			/* Mock StoreDashboard */
-			.dash { width: 360px; background: #fff; border: 1px solid #dfe1e6; border-radius: 8px; padding: 16px; }
+			.dash {
+				width: 360px; background: var(--cs-surface); color: var(--cs-text);
+				border: 1px solid #dfe1e6; border-radius: var(--cs-radius); padding: var(--cs-space);
+			}
 			.dash h2 { margin: 0 0 2px; font-size: 16px; }
-			.dash .ts { color: #6b778c; font-size: 12px; margin: 0 0 12px; }
+			.dash .ts { color: var(--cs-muted); font-size: 12px; margin: 0 0 12px; }
 			.dash .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 			.dash .tile { background: #f4f5f7; border-radius: 6px; padding: 12px; }
 			.dash .tile b { display: block; font-size: 18px; }
